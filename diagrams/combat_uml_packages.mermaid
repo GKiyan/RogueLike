@@ -1,0 +1,225 @@
+classDiagram
+
+namespace Core {
+    class StatType {
+        <<enumeration>>
+        HP
+        ATK
+        DEF
+        MaxHP
+    }
+    class TargetType {
+        <<enumeration>>
+        OneEnemy
+        OneAlly
+        Self
+        AllEnemies
+        AllAllies
+        FrontEnemies
+        BackEnemies
+    }
+    class ActionType {
+        <<enumeration>>
+        BasicAttack
+        HeavyAttack
+    }
+    class EffectType {
+        <<enumeration>>
+        AtkBuff
+        DefBuff
+        AtkDebuff
+        DefDebuff
+    }
+    class IEffect {
+        <<interface>>
+        +EffectType Type
+        +int Duration
+        +bool IsExpired
+        +Apply(ITargetable target) void
+        +TickDuration() void
+    }
+    class ITargetable {
+        <<interface>>
+        +GetStat(StatType) int
+        +TakeDamage(int) void
+        +Heal(int) void
+        +ApplyEffect(IEffect) void
+        +IsAlive() bool
+    }
+}
+
+namespace Rendering {
+    class IRenderer {
+        <<interface>>
+        +RenderCombatState(...) void
+        +RenderActionMenu(...) void
+        +GetPlayerInput() int
+    }
+    class ConsoleRenderer {
+        +RenderCombatState(...) void
+        +RenderActionMenu(...) void
+        +GetPlayerInput() int
+    }
+}
+
+namespace Characters {
+    class CharacterComponent {
+        <<abstract>>
+        +string Name
+        +int Level
+        +int Experience
+        +int Atk
+        +int Def
+        +int Hp
+        +List~int~ ComboIds
+        +GetStat(StatType) int
+        +GainExperience(int) void
+    }
+    class MainCharacter {
+        +Skill BaseSkill
+        +Skill Skill2
+        +Ultimate Ultimate
+    }
+    class SupportCharacter {
+        +Skill Skill
+    }
+    class Unit {
+        -MainCharacter Main
+        -SupportCharacter Support
+        -int Hp
+        -int Def
+        -List~IEffect~ ActiveEffects
+        +GetStat(StatType) int
+        +TakeDamage(int) void
+        +Heal(int) void
+        +ApplyEffect(IEffect) void
+        +IsAlive() bool
+        +IsComboAvailable() bool
+    }
+    class Team {
+        -Unit FrontUnit
+        -Unit MiddleUnit
+        -Unit BackUnit
+        -int Sp
+        -int SpMax
+        -int UltimateGauge
+        -int UltimateMax
+        +GetActiveUnit() Unit
+        +RegenSp() void
+        +UseSp(int) void
+    }
+}
+
+namespace Skills {
+    class Skill {
+        <<abstract>>
+        -string Name
+        -int SpCost
+        -TargetType TargetType
+        -List~Effect~ Effects
+        +GetValidTargets(context) List~ITargetable~
+        +Execute(CharacterComponent caster, List~ITargetable~ targets) void
+    }
+    class Ultimate {
+        -int Threshold
+        +Execute(CharacterComponent caster, List~ITargetable~ targets) void
+    }
+    class ComboSkill {
+        -int RequiredMainComboId
+        -int RequiredSupportComboId
+        +IsUnlocked(MainCharacter, SupportCharacter) bool
+        +Execute(CharacterComponent caster, List~ITargetable~ targets) void
+    }
+}
+
+namespace Effects {
+    class Effect {
+        <<abstract>>
+        -EffectType Type
+        -float Multiplier
+        -int Duration
+        -CharacterComponent Source
+        -ITargetable Target
+        +SetSource(CharacterComponent) void
+        +Apply(ITargetable target) void
+        +TickDuration() void
+    }
+    class DamageEffect {
+        -int BaseDamage
+        +Apply(ITargetable target) void
+    }
+    class HealEffect {
+        -int BaseHeal
+        +Apply(ITargetable target) void
+    }
+    class StatModifierEffect {
+        -int Amount
+        +Apply(ITargetable target) void
+    }
+}
+
+namespace Enemies {
+    class Enemy {
+        <<abstract>>
+        -string Name
+        -int Hp
+        -int Atk
+        -int Def
+        -List~ActionType~ Pattern
+        -int PatternIndex
+        +GetNextAction() ActionType
+        +AdvancePattern() void
+        +GetStat(StatType) int
+        +TakeDamage(int) void
+        +Heal(int) void
+        +ApplyEffect(IEffect) void
+        +IsAlive() bool
+    }
+    class BasicEnemy {
+    }
+}
+
+namespace Combat {
+    class CombatManager {
+        -Team Team
+        -Enemy Enemy
+        -IRenderer Renderer
+        +Run() void
+        +PlayerTurn() void
+        +EnemyTurn() void
+        +CheckVictory() bool
+    }
+}
+
+IEffect <|.. Effect
+ITargetable <|.. Unit
+ITargetable <|.. Enemy
+IRenderer <|.. ConsoleRenderer
+
+CharacterComponent <|-- MainCharacter
+CharacterComponent <|-- SupportCharacter
+
+Effect <|-- DamageEffect
+Effect <|-- HealEffect
+Effect <|-- StatModifierEffect
+
+Skill <|-- Ultimate
+Skill <|-- ComboSkill
+Skill "1" *-- "1..*" Effect
+Skill "1" --> "1" TargetType
+
+MainCharacter "1" *-- "2" Skill : BaseSkill, Skill2
+MainCharacter "1" *-- "1" Ultimate
+SupportCharacter "1" *-- "1" Skill
+
+Unit "1" *-- "1" MainCharacter
+Unit "1" *-- "1" SupportCharacter
+Unit "1" o-- "0..1" ComboSkill
+
+Team "1" o-- "1" Unit : Front
+Team "1" o-- "0..1" Unit : Middle
+Team "1" o-- "0..1" Unit : Back
+
+CombatManager "1" --> "1" Team
+CombatManager "1" --> "1" Enemy
+CombatManager "1" --> "1" IRenderer
